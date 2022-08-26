@@ -2,19 +2,31 @@ use email_newsletter;
 use email_newsletter::conf::get_configuration;
 use email_newsletter::startup::run;
 use reqwest::{Client, Response};
-use sqlx::{query, Connection, PgConnection};
+use sqlx::{query, Connection, PgPool};
 use std::net::TcpListener;
-// You can inspect what code gets generated using
-// `cargo expand --test health_check` (<- name of the test file)
-fn spawn_app() -> String {
+
+pub struct TestApp {
+    pub address: String,
+    pub db_pool: PgPool,
+}
+
+async fn spawn_app() -> TestApp {
     let listener: TcpListener =
         TcpListener::bind("127.0.0.1:0").expect("Failed to bind random port");
     //  trying to bind port 0 will trigger an OS scan for an available port which will then be bound to the application.
     let port: u16 = listener.local_addr().unwrap().port();
-    let server = run(listener).expect("Failed to bind address");
+    let address = format!("http://127.0.0.1:{}", port);
+    let configuration = get_configuration().expect("Failed to read configuration.");
+    let connection_pool = PgPool::connect(&configuration.database.connection_string())
+        .await
+        .expect("Failed to connect to Postgres.");
+    let server = run(listener, connection_pool.clone()).expect("Failed to bind address");
     let _ = tokio::spawn(server);
     // We return the application address to the caller!
-    format!("http://127.0.0.1:{}", port)
+    TestApp {
+        address,
+        db_pool: connection_pool,
+    }
 }
 
 // `tokio::test` is the testing equivalent of `tokio::main`.
@@ -36,7 +48,7 @@ async fn health_check_works() {
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
-    let address: String = spawn_app();
+    let address: TestApp = spawn_app();
     let client: Client = Client::new();
 
     let configuration = get_configuration().expect("Failed to read configuration");
