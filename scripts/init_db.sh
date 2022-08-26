@@ -11,6 +11,10 @@ BOLD="\e[1m"
 UNDERLINE="\e[4m"
 CLEAR="\e[0m"
 
+SCRIPT_PATH=$(realpath "$0")
+SCRIPT_DIR=$(dirname "$SCRIPT_PATH")
+PROJECT_DIR=$(dirname "$SCRIPT_DIR")
+
 # Default vars
 DB_USER="${POSTGRES_USER:=postgres}"
 DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
@@ -104,6 +108,8 @@ fi
 
 set -x
 set -eo pipefail
+
+echo "DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" > $PROJECT_DIR/.env
 
 if [[ -z "${SKIP_DOCKER}" ]]; then
     docker run \
