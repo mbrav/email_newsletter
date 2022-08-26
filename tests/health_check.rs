@@ -1,5 +1,7 @@
 use email_newsletter;
+use email_newsletter::conf::get_configuration;
 use reqwest::{Client, Response};
+use sqlx::{Connection, PgConnection};
 use std::net::TcpListener;
 
 // You can inspect what code gets generated using
@@ -36,6 +38,12 @@ async fn health_check_works() {
 async fn subscribe_returns_a_200_for_valid_form_data() {
     let address: String = spawn_app();
     let client: Client = Client::new();
+
+    let configuration = get_configuration().expect("Failed to read configuration");
+    let connection_string = configuration.database.connection_string();
+    let connection = PgConnection::connect(&connection_string)
+        .await
+        .expect("Failed to connect to Postgres.");
 
     let body = "name=le%20guin&email=ursula_le_guin%40gmail.com";
     let response = client
