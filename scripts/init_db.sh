@@ -20,6 +20,7 @@ DB_USER="${POSTGRES_USER:=postgres}"
 DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
 DB_NAME="${POSTGRES_DB:=newsletter}"
 DB_PORT="${POSTGRES_PORT:=5432}"
+DB_HOST="${POSTGRES_HOST:=localhost}"
 
 help() {
     # Display Help
@@ -35,6 +36,7 @@ help() {
     echo -e $YELLOW"-u  --user          \t$CLEAR DB user. Default: $YELLOW$DB_USER"
     echo -e $YELLOW"-pA --password      \t$CLEAR DB password. Default: $YELLOW$DB_PASSWORD"
     echo -e $YELLOW"-n  --name          \t$CLEAR DB name. Default: $YELLOW$DB_NAME"
+    echo -e $YELLOW"-ho --host          \t$CLEAR DB host. Default: $YELLOW$DB_HOST"
     echo -e $YELLOW"-p  --port          \t$CLEAR DB port. Default: $YELLOW$DB_PORT"
     echo -e
 }
@@ -86,6 +88,12 @@ else
                 shift # shift argument
                 shift # shift value
             ;;
+            --host|-ho)
+                help
+                DB_HOST=("$2")
+                shift # shift argument
+                shift # shift value
+            ;;
             --port|-p)
                 help
                 DB_PORT=("$2")
@@ -109,8 +117,6 @@ fi
 set -x
 set -eo pipefail
 
-echo "DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}" > $PROJECT_DIR/.env
-
 if [[ -z "${SKIP_DOCKER}" ]]; then
     docker run \
     -e POSTGRES_USER=${DB_USER} \
@@ -122,12 +128,14 @@ if [[ -z "${SKIP_DOCKER}" ]]; then
 fi
 
 export PGPASSWORD="${DB_PASSWORD}"
-until psql -h "localhost" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
+until psql -h "${DB_HOST}" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
     echo -e $YELLOW"Postgres is still unavailable - sleeping"$CLEAR
     sleep 1
 done
 echo -e $GREEN"Postgres is up and running on port ${DB_PORT} - running migrations now!"$CLEAR
-export DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}
+DB_URL="postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}"
+echo "DATABASE_URL=${DB_URL}" > $PROJECT_DIR/.env
+export DATABASE_URL=${DB_URL}
 sqlx database create
 sqlx migrate run
 echo -e $GREEN"Postgres has been migrated, ready to go!"$CLEAR
